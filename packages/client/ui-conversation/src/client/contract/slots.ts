@@ -94,6 +94,36 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      */
     'conversation.session.header.utilities': { kind: 'list'; scope: 'session'; owner: ConversationHeaderActionOwnerProps }
     /**
+     * The band above the session header: the column's own top row, a full-width
+     * strip that belongs to the COLUMN rather than to the session — project or
+     * workspace status that stays true ACROSS sessions. It is deliberately not
+     * part of the header: the header is the session's own chrome (title,
+     * lineage, views), it collapses while a session is blank, and everything in
+     * it is session-scoped. Nor does it belong in the transcript, where it
+     * would scroll away from the reader.
+     *
+     * Declared by this package's `conversation` entry and rendered by
+     * ConversationRoot as the column's FIRST row, above the whole header, so the
+     * band stands over everything the column shows rather than beside the view
+     * tabs on one of the header's lines.
+     *
+     * Root scope is the seat not being the session's: the row stays mounted
+     * across sessions and through a blank one, so an occupant is never torn down
+     * by a session change. The row still YIELDS with the column's chrome — the
+     * column hides it while the hero is up, exactly as the header hides itself,
+     * because a band left standing over that screen would read as its content,
+     * and there is no chrome to be the top of with no session at all. Visibility
+     * is therefore the column's decision (hide) and never an unmount, while what
+     * a band REPORTS is the entry's: one whose subject only exists inside a
+     * session gates itself on the current session's availability.
+     *
+     * List kind, rendered in ascending `order`: a band is one row of chrome,
+     * and a second contributor stacks under the first rather than replacing it.
+     * The owner passes nothing — an entry's subject is not the session's, so
+     * what it reports on arrives through its own inject face.
+     */
+    'conversation.session.band': { kind: 'list'; scope: 'root' }
+    /**
      * The conversation view ring: one list entry per view tab (chat here;
      * trajectory/waterfall from ui-trajectory), rendered one-at-a-time by
      * the session body via `only: <active id>`. Declared by this package's
@@ -354,6 +384,40 @@ declare module '@deepseek-ai/cordis' {
 }
 
 /**
+ * Optional in-GUI file viewer, consumed via `ctx.get('fileViewer')`
+ * (optional-service convention): every file affordance the transcript draws — a
+ * tool row's path link and a prose mention alike — is opened through ONE seam,
+ * the chat view's `openFile`, and this service is asked first. Absent service
+ * (a deployment that composes no viewer), or an `open` that answers false, hands
+ * the path to the editor exactly as before.
+ *
+ * The seam exists because "open this file" has two defensible answers — the
+ * operator's editor, which is out-of-band but the only place to edit, and a panel
+ * inside the GUI, which keeps the file beside the conversation that named it —
+ * and neither the caller nor the path can choose between them. The deployment
+ * decides, and answers false for paths it will not serve.
+ */
+export interface FileViewer {
+  /**
+   * Show one file's content inside the GUI.
+   * @param path - the ABSOLUTE path the chat view already resolved against the
+   * session's working directory. A viewer is never asked to resolve a relative
+   * path, so every caller and every surface agree on the same file.
+   * @returns whether this viewer took it; false means the caller should fall back
+   * to the editor. A viewer must answer false rather than open a surface that
+   * cannot show the file.
+   */
+  open(path: string): boolean
+}
+
+declare module '@deepseek-ai/cordis' {
+  interface Context {
+    /** In-GUI file viewer; reach via ctx.get — optional. */
+    fileViewer: FileViewer
+  }
+}
+
+/**
  * Owner currency of the chat view's turn-tail hole: the engine-owned Turn and
  * the closing assistant's anchor. Registrants read their own typed Turn data
  * and open files through the same opener the tool rows use.
@@ -401,6 +465,13 @@ export interface ChatNodeOwnerProps {
   openFile: (path: string) => void
   inspectCall: (callId: CallId) => void
   forkAt: (seq: number) => void
+  /**
+   * Render an Assistant step without its Think rows, which the activity group
+   * ahead of it owns: the chat flow splits a step carrying both reasoning and
+   * content so the reasoning can fold while the content stays readable.
+   * Renderers that paint no reasoning ignore it.
+   */
+  omitReasoning?: boolean | undefined
   /** Render a historical image group through the attachment slot. */
   renderMessageImages: RenderMessageImages
   fileMentions: (owner: TurnTailOwnerProps) => MarkdownFileMentions | undefined
@@ -613,8 +684,8 @@ export interface HeroBrandMarkOwnerProps {
 
 /**
  * Full conversation-slot component props: runtime & child-render (view ring
- * + composer chain/bar + input-region + hero picker slots) & store & injected
- * shares & the locale seat.
+ * + composer chain/bar + input-region + hero picker slots + the column's own
+ * band row) & store & injected shares & the locale seat.
  */
 export type ConversationSlotProps =
   PropsRuntime<'conversation'> & PropsRenderSlots<
@@ -626,6 +697,7 @@ export type ConversationSlotProps =
     | 'conversation.hero.brand.mark'
     | 'conversation.hero.workspace'
     | 'conversation.hero.agentPreset'
+    | 'conversation.session.band'
   >
   & InjectFace<ConversationInjected>
   & PropsLocale<'conversation'>
@@ -637,10 +709,12 @@ export type ConversationSessionSlotProps =
   & PropsStore<ChatStore>
   & ConversationSessionInjected
 
-/** Full strict-session header props: shared store, tabs/actions render shares, navigation, and locale. */
+/** Full strict-session header props: shared store, tabs/action render shares, navigation, and locale. */
 export type ConversationSessionHeaderSlotProps =
   PropsRuntime<'conversation.session.header'>
-  & PropsRenderSlots<'conversation.session.header.actions' | 'conversation.session.header.utilities'>
+  & PropsRenderSlots<
+    | 'conversation.session.header.actions' | 'conversation.session.header.utilities'
+  >
   & PropsStore<ChatStore>
   & ConversationSessionHeaderInjected
   & PropsLocale<'conversation'>

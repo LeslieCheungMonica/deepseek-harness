@@ -1,0 +1,81 @@
+/* One folded run of tool activity: a disclosure header plus its indented
+   member rows.
+
+   The member container carries the column's own 16px rhythm, because the group
+   is ONE flex item of `.column` — its rows would otherwise lose the gap that
+   every other flow row gets from the column. It leaves the flow entirely while
+   the run is folded and settled (`data-collapsed`), so a fold costs exactly one
+   24px header row rather than a header plus the two gaps around an empty box.
+
+   Empty members (an Assistant step carrying nothing but Tool heads) must not
+   consume the rhythm either — the same rule `.flowItem:empty` applies one
+   level up. */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.row {
+  position: relative;
+  overflow: hidden;
+}
+
+/* The in-flight member brings its own running chrome (every Tool row and the
+   Think row carry their own sweep), so the group adds none of its own: two
+   sweeps over one line would just read as noise. */
+.members {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  margin-top: 8px;
+  margin-left: 22px;
+  padding-left: 8px;
+  border-left: 1px solid var(--dsw-alias-border-l2);
+}
+
+.members[data-collapsed] {
+  display: none;
+}
+
+.member {
+  min-width: 0;
+}
+
+.member:empty {
+  display: none;
+}
+
+.leading {
+  flex-shrink: 0;
+}
+
+.chevron {
+  color: var(--dsw-alias-label-secondary);
+}
+
+.title {
+  font-weight: 400;
+}
+
+.separator {
+  flex: none;
+  width: 2px;
+  height: 2px;
+  margin: 0 8px;
+  border-radius: 1px;
+  background: var(--dsw-alias-label-caption);
+}
+
+.summary {
+  min-width: 0;
+  overflow: hidden;
+  flex: 1 1 auto;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 14px;
+  line-height: 24px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

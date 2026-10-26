@@ -18,7 +18,7 @@ import {
   captureStableAria, compareOrRefreshGolden, fixtureUserPrompts,
   launchWebScaffold, recordFixture, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
-import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
+import { connectFreshWorkspace, expandActivityGroups, newEnglishPage, saveFailureShot } from './support.ts'
 
 const FIXTURE = fileURLToPath(new URL('./snapshots/code-mode-round/session.jsonl', import.meta.url))
 const UI_EXPECTED = fileURLToPath(new URL('./snapshots/code-mode-round/ui.expected.md', import.meta.url))
@@ -105,6 +105,9 @@ describe('web e2e: Code Mode round renders nested sub-calls', () => {
     await expect.poll(() => page.getByText('DONE', { exact: true }).count(), { timeout: 15_000 }).toBeGreaterThanOrEqual(1)
     // The parent run_code row wears the code variant with the model-authored
     // description as its summary (the presentCall contract).
+    // Activity groups fold Think and Tool rows into one disclosure row, so the
+    // reader's own gesture — opening the group — comes before touching a row.
+    await expandActivityGroups(page)
     const codeRow = page.locator('[data-variant="code"]').first()
     await codeRow.waitFor({ timeout: 10_000 })
     // Nested rows are visible WITHOUT any expand interaction, inside the
@@ -120,6 +123,9 @@ describe('web e2e: Code Mode round renders nested sub-calls', () => {
 
   it.skipIf(MODE === 'record')('a bash sub-row click leaves the default details panel closed', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-code-mode-details'))
+    // Activity groups fold Think and Tool rows into one disclosure row, so the
+    // reader's own gesture — opening the group — comes before touching a row.
+    await expandActivityGroups(page)
     const nest = page.locator('[data-subcalls]').first()
     const frame = page.locator('[style*="grid-template-columns"]').first()
     expect(await frame.getAttribute('data-details-collapsed')).toBe('true')

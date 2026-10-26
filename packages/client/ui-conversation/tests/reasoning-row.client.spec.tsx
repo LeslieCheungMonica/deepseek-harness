@@ -120,4 +120,38 @@ describe('ReasoningRow', () => {
     expect(view.container.querySelector('[class*="ioCard"]')).toBeNull()
     expect(view.container.querySelector('[class*="thinkBody"]')).not.toBeNull()
   })
+  it('omits the Think rows when the activity group ahead of the step owns them', () => {
+    const view = render(
+      <AssistantMarkdown
+        t={t}
+        blocks={[
+          { kind: 'reasoning', text: 'weigh the options' },
+          { kind: 'text', text: 'Done.' },
+        ]}
+        streaming={false}
+        omitReasoning
+        renderMessageImages={renderMessageImages}
+      />,
+    )
+
+    expect(view.queryByText('Think')).toBeNull()
+    expect(view.getByText('Done.')).toBeTruthy()
+  })
+
+  it('keeps the Think rows when the step is whole', () => {
+    const view = render(
+      <AssistantMarkdown
+        t={t}
+        blocks={[
+          { kind: 'reasoning', text: 'weigh the options' },
+          { kind: 'text', text: 'Done.' },
+        ]}
+        streaming={false}
+        renderMessageImages={renderMessageImages}
+      />,
+    )
+
+    expect(view.getByText('Think')).toBeTruthy()
+    expect(view.getByText('Done.')).toBeTruthy()
+  })
 })

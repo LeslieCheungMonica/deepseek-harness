@@ -7,6 +7,7 @@ import clsx from 'clsx'
 import type { WorkspaceId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ConversationSlotProps, InputZone } from '../contract/slots.ts'
 import { HeroGlow, HeroShell, WorkspaceChip, workspaceLabel } from './EmptyHero.tsx'
+import { hidesChrome } from './ConversationSession.tsx'
 import css from './ConversationRoot.module.css'
 
 /** Full props composed from the slot contract. */
@@ -183,9 +184,45 @@ export function ConversationRoot({
     </div>
   )
 
+  // The line between the column's chrome and its transcript. It is a row of the
+  // root's own rather than the header's `::after`, because the chrome is more than
+  // the title row: the column renders a band seat ABOVE the header
+  // (`conversation.session.band`, see `topBand` below), and a line drawn inside the
+  // header would sit between the band and the conversation - closing the chrome in
+  // the middle of itself. With no band registered it is the header's hairline in the
+  // place it has always been.
+  const bandRule = <div className={css.bandRule} data-conversation-band-rule="" />
+
+  // The column's own band row, above the header and so above everything else the
+  // column shows: what a deployment registers in `conversation.session.band`
+  // describes the COLUMN's subject (a project's stage, a delivery flow) rather than
+  // this session's content, and a row of its own gives it the column's full width
+  // instead of half of the tabs' line. The seat is the root's because the row is the
+  // column's: it stays mounted across sessions, and the occupant gates itself (see
+  // the contract's note on the seat).
+  //
+  // The row YIELDS where the column's chrome yields, and it is hidden rather than
+  // unmounted in both cases - the header's own move, and for the same reason: a seat
+  // that was torn down and rebuilt would start over on the first message. The two
+  // places the chrome yields are different facts, though:
+  //
+  //   - no session open at all: there is no column chrome to be the top of, which is
+  //     the same fact that keeps the header's own seat from rendering;
+  //   - a blank session: that screen is the hero - the session's own picture - so the
+  //     header steps aside for it (`hidesChrome`) and the band's row goes with it,
+  //     because a band left standing over the hero would read as that screen's content.
+  const bandHidden = sessionId === undefined || hidesChrome(session?.blank, composerPhase)
+
   return (
     <div className={css.root} data-phase={phase}>
+      <div
+        className={clsx(css.topBand, bandHidden && css.topBandHidden)}
+        data-conversation-band=""
+      >
+        {renderSlot('conversation.session.band', {})}
+      </div>
       {renderSlot('conversation.session.header', {})}
+      {bandRule}
       <div className={css.scrollBody} data-conversation-scroll="">
         {renderSlot('conversation.session', {})}
         {composerSeat}

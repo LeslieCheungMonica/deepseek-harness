@@ -19,7 +19,7 @@ import {
   webSnapshotMode,
   type WebScaffold,
 } from './scaffold.ts'
-import { conversationContextKey, newEnglishPage, saveFailureShot } from './support.ts'
+import { conversationContextKey, expandActivityGroups, newEnglishPage, saveFailureShot } from './support.ts'
 
 const MODE = webSnapshotMode()
 const SESSION_ID = 'chat-long-interactions-e2e'
@@ -228,6 +228,9 @@ describe('web e2e: long Chat interaction contract', () => {
     ))))
     expect(toolKinds).toEqual(['tool-call', 'tool-call'])
 
+    // Activity groups fold Think and Tool rows into one disclosure row, so the
+    // reader's own gesture — opening the group — comes before touching a row.
+    await expandActivityGroups(page)
     const summary1 = call1.locator('[data-sample="bash"]')
     const summary2 = call2.locator('[data-sample="bash"]')
     expect(await summary1.getAttribute('aria-expanded')).toBe('false')

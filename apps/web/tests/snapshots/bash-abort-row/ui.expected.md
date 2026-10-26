@@ -10,6 +10,9 @@
 - text: "Run two shell commands: wait for cancellation, then write skipped.txt. {{date}} {{clock}}"
 - button "Copy":
   - img
+- button "Activity" [expanded]:
+  - img
+  - text: Activity
 - button "Context injection @deepseek-ai/dsh-system-prompt":
   - img
   - img

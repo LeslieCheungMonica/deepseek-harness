@@ -18,7 +18,7 @@ import {
   captureStableAria, compareOrRefreshGolden, fixtureUserPrompts,
   launchWebScaffold, recordFixture, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
-import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
+import { connectFreshWorkspace, expandActivityGroups, newEnglishPage, saveFailureShot } from './support.ts'
 
 const FIXTURE = fileURLToPath(new URL('./snapshots/cordis-tool-round/session.jsonl', import.meta.url))
 const UI_EXPECTED = fileURLToPath(new URL('./snapshots/cordis-tool-round/ui.expected.md', import.meta.url))
@@ -139,6 +139,9 @@ describe('web e2e: Cordis tools use their owned cards', () => {
     await expect.poll(() => page.getByText('CORDIS_UI_DONE', { exact: true }).count(), { timeout: 15_000 })
       .toBeGreaterThanOrEqual(1)
 
+    // Activity groups fold Think and Tool rows into one disclosure row, so the
+    // reader's own gesture — opening the group — comes before touching a row.
+    await expandActivityGroups(page)
     const inspectRow = page.locator('[data-tool="cordis_inspect_self"]').filter({ hasText: 'Inspect' }).first()
     await inspectRow.waitFor({ timeout: 10_000 })
 

@@ -199,6 +199,12 @@ export function apply(ctx: Context): void {
     children: {
       'conversation.session': { kind: 'single', scope: 'session' },
       'conversation.session.header': { kind: 'single', scope: 'session' },
+      // The column's band: the ROOT renders it, above the whole header, because the
+      // row is the column's own rather than a line of the session's chrome — and a
+      // seat declared here (rather than by the header entry) is what lets an
+      // occupant outlive a session the header is scoped to. See the contract's own
+      // note on the seat, and `.topBand` in ConversationRoot.module.css.
+      'conversation.session.band': { kind: 'list', scope: 'root' },
       'conversation.composer': { kind: 'chain', scope: 'session' },
       'conversation.composer.bar': { kind: 'single', scope: 'session-maybe' },
       'conversation.input.overlay': { kind: 'list', scope: 'session' },
@@ -398,7 +404,14 @@ export function apply(ctx: Context): void {
         fileMentions: owner => ctx.get('chatFileMentions')?.forClosing(owner),
         openFile: (path) => {
           const cwd = sessions.list.getSnapshot().byId[sessionId]?.cwd
-          return workspaces.openPath(resolveWorkspacePath(cwd, path))
+          const resolved = resolveWorkspacePath(cwd, path)
+          // Every file affordance in the transcript lands here — a tool row's
+          // path link and a prose mention alike — so this is the one seam where a
+          // deployment can answer "show it in the GUI" instead of "hand it to the
+          // editor". Optional service (see FileViewer): no viewer, or a viewer
+          // that declines this path, keeps the editor behaviour exactly.
+          if (ctx.get('fileViewer')?.open(resolved) === true) return Promise.resolve()
+          return workspaces.openPath(resolved)
         },
         loadOlder: () => { void scoped.loadOlder() },
         loadImage: attachment => conversation.resolveImage(sessionId, attachment),

@@ -19,7 +19,7 @@ import {
   assertFixtureInventory, captureStableAria, compareOrRefreshGolden, fixtureUserPrompts,
   launchWebScaffold, recordFixture, seedSession, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
-import { newEnglishPage, saveFailureShot } from './support.ts'
+import { expandActivityGroups, newEnglishPage, saveFailureShot } from './support.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/navigation-panes', import.meta.url))
 const SEED = join(SNAPSHOT_DIR, 'seed.jsonl')
@@ -400,6 +400,9 @@ describe('web e2e: navigation & panes over a rich seeded session', () => {
   it.skipIf(MODE === 'record')('bash and file-path rows leave the default details column closed', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-navigation-details'))
     await ensureSeedOpen(page)
+    // Activity groups fold Think and Tool rows into one disclosure row, so the
+    // reader's own gesture — opening the group — comes before touching a row.
+    await expandActivityGroups(page)
     const bashRow = page.locator('[data-sample="bash"]').first()
     await bashRow.waitFor({ timeout: 15_000 })
     const frame = page.locator('[style*="grid-template-columns"]').first()
@@ -435,6 +438,9 @@ describe('web e2e: navigation & panes over a rich seeded session', () => {
     // tool-row interaction): open it if this fresh view leaves it collapsed.
     // Expanded, the recorded command's own output sits in the message flow,
     // derived from the logged call/result presentations alone.
+    // Activity groups fold Think and Tool rows into one disclosure row, so the
+    // reader's own gesture — opening the group — comes before touching a row.
+    await expandActivityGroups(page)
     const bashRow = page.locator('[data-sample="bash"]').first()
     await bashRow.waitFor({ timeout: 15_000 })
     if (await bashRow.getAttribute('aria-expanded') !== 'true') await bashRow.click()

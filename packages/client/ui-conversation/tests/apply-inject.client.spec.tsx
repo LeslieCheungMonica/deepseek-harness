@@ -251,6 +251,44 @@ describe('conversation slot inject API', () => {
     await b.runtime.dispose()
   })
 
+  // The optional in-GUI viewer (see FileViewer): every file affordance in the
+  // transcript funnels through openFile, so these three cases are the whole
+  // contract a deployment can rely on.
+  it('openFile hands an accepted path to the in-GUI viewer instead of the editor', async () => {
+    const b = await bench()
+    const open = vi.fn(() => true)
+    b.runtime.provide('fileViewer', { open })
+    const { injected } = b.chatViewApi(ROOT)
+    await injected.openFile('src/a.ts')
+    // Absolute and resolved against the session's cwd: a viewer never resolves.
+    expect(open).toHaveBeenCalledWith('/proj/src/a.ts')
+    expect(b.runtime.workspaces.calls).not.toContainEqual({ method: 'openPath', args: ['/proj/src/a.ts'] })
+    await b.runtime.dispose()
+  })
+
+  it('openFile falls back to the editor when the viewer declines the path', async () => {
+    const b = await bench()
+    const open = vi.fn(() => false)
+    b.runtime.provide('fileViewer', { open })
+    const { injected } = b.chatViewApi(ROOT)
+    await injected.openFile('src/a.ts')
+    expect(open).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => {
+      expect(b.runtime.workspaces.calls).toContainEqual({ method: 'openPath', args: ['/proj/src/a.ts'] })
+    })
+    await b.runtime.dispose()
+  })
+
+  it('openFile without a viewer keeps the editor behaviour exactly', async () => {
+    const b = await bench()
+    const { injected } = b.chatViewApi(ROOT)
+    await injected.openFile('src/a.ts')
+    await vi.waitFor(() => {
+      expect(b.runtime.workspaces.calls).toContainEqual({ method: 'openPath', args: ['/proj/src/a.ts'] })
+    })
+    await b.runtime.dispose()
+  })
+
   it('routes workspace switching through the runtime owner, carrying the draft', async () => {
     const b = await bench()
     const resident = b.residentApi(ROOT)

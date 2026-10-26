@@ -2,7 +2,7 @@
 
 import { useEffect, useSyncExternalStore } from 'react'
 import clsx from 'clsx'
-import type { SessionId, SessionListState, SessionSummary } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ComposerPhase, SessionId, SessionListState, SessionSummary } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
   ConversationSessionHeaderSlotProps, ConversationSessionSlotProps,
 } from '../contract/slots.ts'
@@ -54,6 +54,30 @@ function equalBreadcrumbs(left: readonly Breadcrumb[], right: readonly Breadcrum
 }
 
 /**
+ * Whether the column's chrome steps aside for the hero screen.
+ *
+ * A blank session that has not been prompted yet is the hero: that screen is the
+ * session's OWN picture (the mark, the workspace chip, the centred composer), not
+ * the column's chrome, so the title row and the view tabs would be furniture around
+ * a screen that is not about them.
+ *
+ * ONE predicate for the two rows that ask it, because they are now two places:
+ * the header hides ITSELF, and the column's band row above it (rendered by
+ * `ConversationRoot`) asks the same question. A band that kept showing above a
+ * header that had stepped aside would leave the column's top row on a screen whose
+ * chrome is gone — the band would read as content, which is the one thing it is not.
+ * @param blank - the session's own blank flag; `undefined` while the store has no such session.
+ * @param composerPhase - the composer's shape, from the same session store; `undefined` under the same rule.
+ * @returns whether that chrome should be hidden.
+ */
+export function hidesChrome(
+  blank: boolean | undefined,
+  composerPhase: ComposerPhase | undefined,
+): boolean {
+  return blank === true && composerPhase === 'blank'
+}
+
+/**
  * Renders Session header chrome above the resident conversation scrollport.
  * @param props - Strict Session store, view ledger, navigation, render, and locale shares.
  * @returns the hidden blank-session header or visible title and tabs.
@@ -69,7 +93,7 @@ export function ConversationSessionHeader({
   const ancestry = useSessions(s => deriveAncestry(s, sessionId), equalBreadcrumbs)
   const composerPhase = useSession(s => s.composerPhase)
   const blank = useSession(s => s.blank)
-  const hideChrome = blank && composerPhase === 'blank'
+  const hideChrome = hidesChrome(blank, composerPhase)
 
   return (
     <header
@@ -107,22 +131,30 @@ export function ConversationSessionHeader({
               {renderSlot('conversation.session.header.utilities', {})}
             </div>
           </div>
-          {tabs.length > 1 && (
-            <div className={css.tabs} role="tablist">
-              {tabs.map(viewTab => (
-                <button
-                  key={viewTab.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={viewTab.id === active?.id}
-                  className={clsx(css.tab, viewTab.id === active?.id && css.tabActive)}
-                  onClick={() => { actions.setView(viewTab.id) }}
-                >
-                  {viewTab.label}
-                </button>
-              ))}
-            </div>
-          )}
+          {/* The header's chrome row: the view tabs, and the tabs only. It used to
+              carry the column's band seat on its right-hand half; that seat is the
+              COLUMN's own top row now — above this whole header, so it stands over
+              everything the column shows rather than beside the tabs (see
+              `ConversationRoot`). The row keeps its own element so the tabs' line
+              is the header's, whether or not a band is registered above it. */}
+          <div className={css.chromeRow}>
+            {tabs.length > 1 && (
+              <div className={css.tabs} role="tablist">
+                {tabs.map(viewTab => (
+                  <button
+                    key={viewTab.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={viewTab.id === active?.id}
+                    className={clsx(css.tab, viewTab.id === active?.id && css.tabActive)}
+                    onClick={() => { actions.setView(viewTab.id) }}
+                  >
+                    {viewTab.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </>
       )}
     </header>

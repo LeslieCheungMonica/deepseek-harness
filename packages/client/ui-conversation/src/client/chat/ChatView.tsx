@@ -12,11 +12,18 @@
 // Render economics: order changes only when rows enter, leave or move. Each
 // ChatNodeSeat subscribes to one Node key, so Assistant deltas and Tool
 // lifecycle updates replace only their own row without remounting it.
+// The grouping pass derives from order, so it costs nothing per streaming
+// chunk; the one class that can move under it (a running Assistant step
+// gaining its answer text) arrives through its own signal.
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { ConversationTimelineSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
 import { Button, IconChevronDownOutline14, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatViewSlotProps, RenderMessageImages } from '../contract/slots.ts'
+import { ActivityGroup } from './ActivityGroup.tsx'
+import { flowClassSignal, groupActivity, type ActivityMemberPlan } from './activity-group-model.ts'
+import { anchorElement } from './chat-anchor.ts'
+import { StepReasoningSeat } from './StepReasoningSeat.tsx'
 import { PendingSteeringBubble } from './MessageItem.tsx'
 import { ChatNodeSeat } from './ChatNodeSeat.tsx'
 import { formatRunDuration } from './message-chrome.ts'
@@ -34,14 +41,6 @@ interface PagingAnchor {
   key: string
   /** Row top relative to the scrollport after the latest user scroll. */
   top: number
-}
-
-/** Find an already-rendered settled row without interpolating a selector. */
-function anchorElement(list: HTMLElement, key: string): HTMLElement | null {
-  for (const row of list.querySelectorAll<HTMLElement>('[data-chat-anchor-key]')) {
-    if (row.dataset.chatAnchorKey === key) return row
-  }
-  return null
 }
 
 /** Row position in scrollport coordinates (viewport-independent). */
@@ -161,6 +160,15 @@ export function ChatView({
 }: ChatViewSlotProps) {
   const order = useSession(s => s.chat.order)
   const nodeStore = useSession(s => s.chat.nodes)
+  // The grouping pass below is derived from the flow order, which does NOT
+  // move while an Assistant step streams: the step keeps its key as its blocks
+  // grow. This signal is the one thing that invalidates a derived pass, and it
+  // says nothing about reasoning text, so chunks do not re-derive.
+  const classSignal = useSession(s => flowClassSignal(s.chat.order, s.chat.nodes))
+  const flow = useMemo(
+    () => groupActivity(order, nodeStore),
+    [order, nodeStore, classSignal],
+  )
   const timeline = useSession(s => s.chat.timeline)
   const inbox = useSession(s => s.queue)
   // Workspace root off the session list row: path summaries display relative to it.
@@ -412,6 +420,42 @@ export function ChatView({
     loadOlder()
   }
 
+  /**
+   * Render one flow node at its seat. Shared by plain rows and by the rows a
+   * folded activity group owns, so a node renders identically either way and a
+   * group can never change what its members are.
+   * @param nodeKey - the flow key to render.
+   * @param omitReasoning - render an Assistant step without the Think rows the
+   *  group ahead of it owns.
+   */
+  const renderSeat = (nodeKey: string, omitReasoning?: true) => (
+    <ChatNodeSeat
+      nodeKey={nodeKey}
+      useSession={useSession}
+      selectedCallId={selectedCallId}
+      cwd={cwd}
+      openFile={requestOpenFile}
+      inspectCall={inspectCall}
+      forkAt={forkAt}
+      omitReasoning={omitReasoning}
+      renderMessageImages={renderMessageImages}
+      fileMentions={fileMentions}
+      renderSlot={renderSlot}
+      t={t}
+    />
+  )
+
+  /**
+   * Render one activity member. A member that contributes only its Think rows
+   * (a step whose prose renders after the group) goes through the reasoning
+   * seat, which watches its own node so a still-streaming Think row stays live.
+   * @param member - the member plan from the grouping pass.
+   * @returns the row to place inside the group.
+   */
+  const renderMember = (member: ActivityMemberPlan) => member.reasoningOnly === true
+    ? <StepReasoningSeat nodeKey={member.key} useSession={useSession} t={t} />
+    : renderSeat(member.key)
+
   return (
     <div className={css.root}>
       <div ref={listRef} className={css.scroll}>
@@ -429,19 +473,18 @@ export function ChatView({
               </button>
             </div>
           )}
-          {order.map(nodeKey => (
-            <ChatNodeSeat
-              key={nodeKey}
-              nodeKey={nodeKey}
+          {flow.map(entry => entry.type === 'node' ? (
+            <Fragment key={entry.key}>
+              {renderSeat(entry.key, entry.omitReasoning)}
+            </Fragment>
+          ) : (
+            <ActivityGroup
+              key={entry.key}
+              groupKey={entry.key}
+              members={entry.members.map(member => ({ key: member.key, element: renderMember(member) }))}
+              thoughts={entry.thoughts}
+              calls={entry.calls}
               useSession={useSession}
-              selectedCallId={selectedCallId}
-              cwd={cwd}
-              openFile={requestOpenFile}
-              inspectCall={inspectCall}
-              forkAt={forkAt}
-              renderMessageImages={renderMessageImages}
-              fileMentions={fileMentions}
-              renderSlot={renderSlot}
               t={t}
             />
           ))}

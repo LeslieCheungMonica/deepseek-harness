@@ -25,7 +25,7 @@ import {
   assertFixtureInventory, captureStableAria, compareOrRefreshGolden, fixtureUserPrompts,
   launchWebScaffold, realizeSeedFixture, recordFixture, seedSession, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
-import { newEnglishPage, saveFailureShot } from './support.ts'
+import { expandActivityGroups, newEnglishPage, saveFailureShot } from './support.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/seeded-history', import.meta.url))
 const SEED = fileURLToPath(new URL('./snapshots/seeded-history/seed.jsonl', import.meta.url))
@@ -393,6 +393,9 @@ describe('web e2e: seeded history renders through cold resume', () => {
     // Interaction over cold-resumed history: read summaries are host-open
     // file links (not expand-in-place / not details). Runs after the golden
     // capture; still zero model calls.
+    // Activity groups fold Think and Tool rows into one disclosure row, so the
+    // reader's own gesture — opening the group — comes before touching a row.
+    await expandActivityGroups(page)
     const fileLink = page.locator('[data-variant="read"] button').first()
     await fileLink.waitFor({ timeout: 10_000 })
     const frame = page.locator('[style*="grid-template-columns"]').first()
@@ -414,6 +417,9 @@ describe('web e2e: seeded history renders through cold resume', () => {
 
   it.skipIf(MODE === 'record')('a Host open refusal keeps the reason and retries the same path', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-seeded-file-open-failure'))
+    // Activity groups fold Think and Tool rows into one disclosure row, so the
+    // reader's own gesture — opening the group — comes before touching a row.
+    await expandActivityGroups(page)
     const fileLink = page.locator('[data-variant="read"] button').first()
     await fileLink.waitFor({ timeout: 10_000 })
     const openPath = vi.spyOn(scaffold.ctx.apiProxy.host, 'openPath')

@@ -97,6 +97,21 @@ describe('SettingsRoot trigger', () => {
   })
 })
 
+describe('SettingsPanel mounting', () => {
+  it('portals the panel to document.body, out of whatever container hosts the seat', () => {
+    const { view } = mount()
+    openPanel()
+    const dialog = screen.getByRole('dialog')
+    // Not a style question: this panel is a full-viewport layer, and a host that
+    // renders the seat inside a column (a sidebar drawer) kept it off the screen
+    // entirely in the native WKWebView app — measured there, with the mask beside
+    // it painting normally. Portalling is what ui-primitives' Modal already does
+    // for the same reason, so the two modals behave alike.
+    expect(view.container.contains(dialog)).toBe(false)
+    expect(dialog.parentElement!.parentElement).toBe(document.body)
+  })
+})
+
 describe('SettingsPanel chrome seats', () => {
   it('names the dialog via aria-labelledby pointing at the header seat node', () => {
     mount()

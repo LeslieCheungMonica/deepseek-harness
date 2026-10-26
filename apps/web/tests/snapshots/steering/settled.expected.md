@@ -12,18 +12,10 @@
 - text: Use the ask_user_question tool to ask me exactly one question with id "checkpoint", question "Ready to continue?", header "Checkpoint", and options labeled "Yes" and "No". After I answer, reply with one short sentence acknowledging my answer and stop. {{clock}}
 - button "Copy":
   - img
-- button "Context injection @deepseek-ai/dsh-system-prompt":
+- button "Activity 1 tool call · 1 thought":
   - img
   - img
-  - text: Context injection @deepseek-ai/dsh-system-prompt
-- button "Think The user wants me to use the ask_user_question tool to ask them a specific question with the given parameters. Let me do exactly that.":
-  - img
-  - img
-  - text: Think The user wants me to use the ask_user_question tool to ask them a specific question with the given parameters. Let me do exactly that.
-- button "Ask question 1/1 answered":
-  - img
-  - img
-  - text: Ask question 1/1 answered
+  - text: Activity 1 tool call · 1 thought
 - text: "Interjection: include the word BANANA in your final reply. {{clock}}"
 - button "Copy":
   - img

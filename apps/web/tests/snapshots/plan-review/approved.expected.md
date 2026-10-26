@@ -25,14 +25,10 @@
   - text: Since the user has explicitly asked me not to read or write any files and to go straight to planning, I'll proceed with
   - code: exit_plan_mode
   - text: .
-- 'button "Tool call exit_plan_mode · # Add `--greeting` flag to CLI"':
+- button "Activity 1 tool call · 1 thought":
   - img
   - img
-  - text: "Tool call exit_plan_mode · # Add `--greeting` flag to CLI"
-- 'button "Think The plan was approved. The user''s last instruction says: \"Once the plan is approved, reply with the single word DONE and stop.\" So I should just reply with DONE and stop."':
-  - img
-  - img
-  - text: "Think The plan was approved. The user's last instruction says: \"Once the plan is approved, reply with the single word DONE and stop.\" So I should just reply with DONE and stop."
+  - text: Activity 1 tool call · 1 thought
 - paragraph: DONE
 - button "Copy":
   - img

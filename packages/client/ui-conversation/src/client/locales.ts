@@ -71,8 +71,10 @@ export const zh = {
   'access.confirm.acknowledge': '我已了解风险，并愿意继续',
   'access.confirm.cancel': '取消',
   'access.confirm.enable': '启用 Full access',
-  'hero.headline': '探索未至之境',
-  'hero.preview': '预览版',
+  // The hero's product title: this deployment's own name rather than a
+  // translated phrase, so both dictionaries carry the same string — a brand
+  // does not inflect. It replaced the shipped phrase and its "preview" badge.
+  'hero.headline': 'ForgeX',
   'hero.chooseWorkspace': '选择工作区',
   'session.hierarchy': '会话层级',
   'details.title': '详情',
@@ -92,6 +94,11 @@ export const zh = {
   'chat.loadError': '历史加载失败：{message}（{code}）',
   'chat.loadOlder': '加载更早',
   'chat.toBottom': '回到底部',
+  'chat.activity.title': '活动',
+  'chat.activity.calls.one': '{count} 次工具调用',
+  'chat.activity.calls.other': '{count} 次工具调用',
+  'chat.activity.thoughts.one': '{count} 条思考',
+  'chat.activity.thoughts.other': '{count} 条思考',
   'fileOpen.title': '无法打开文件',
   'fileOpen.unknown': '无法打开此文件',
   'fileOpen.folderTitle': '无法打开文件夹',
@@ -248,8 +255,9 @@ export const en = {
   'access.confirm.acknowledge': 'I understand the risks and want to continue',
   'access.confirm.cancel': 'Cancel',
   'access.confirm.enable': 'Enable Full access',
-  'hero.headline': 'Into the Unknown',
-  'hero.preview': 'Preview',
+  // See the Chinese dictionary: the hero title is the deployment's product
+  // name, identical in every locale.
+  'hero.headline': 'ForgeX',
   'hero.chooseWorkspace': 'Choose workspace',
   'session.hierarchy': 'Session hierarchy',
   'details.title': 'Details',
@@ -269,6 +277,11 @@ export const en = {
   'chat.loadError': 'Failed to load history: {message} ({code})',
   'chat.loadOlder': 'Load earlier',
   'chat.toBottom': 'Back to bottom',
+  'chat.activity.title': 'Activity',
+  'chat.activity.calls.one': '{count} tool call',
+  'chat.activity.calls.other': '{count} tool calls',
+  'chat.activity.thoughts.one': '{count} thought',
+  'chat.activity.thoughts.other': '{count} thoughts',
   'fileOpen.title': 'Couldn’t open file',
   'fileOpen.unknown': 'Couldn’t open this file',
   'fileOpen.folderTitle': 'Couldn’t open folder',

@@ -22,6 +22,7 @@ import { en, zh } from '../src/client/locales.ts'
 import { ConversationRoot } from '../src/client/skeleton/ConversationRoot.tsx'
 import { ConversationSession, ConversationSessionHeader } from '../src/client/skeleton/ConversationSession.tsx'
 import { HeroShell } from '../src/client/skeleton/EmptyHero.tsx'
+import css from '../src/client/skeleton/ConversationRoot.module.css'
 import type { HeroShellProps } from '../src/client/skeleton/EmptyHero.tsx'
 import { InputBar } from '../src/client/skeleton/InputBar.tsx'
 import type { InputBarProps } from '../src/client/skeleton/InputBar.tsx'
@@ -59,6 +60,17 @@ const t: ConversationRootProps['t'] = makeTranslate(zh, commonZh)
 const sid = (id: string) => id as SessionId
 const wid = (id: string) => id as WorkspaceId
 const SID = sid('s1')
+
+/**
+ * The band row's own "taking no space" class, as a value.
+ *
+ * Read out of the CSS module rather than hard-coded (the class name is hashed), and
+ * `?? ''` rather than a cast: a lookup into a CSS module is `string | undefined`
+ * under `noUncheckedIndexedAccess`, and a class the stylesheet had stopped declaring
+ * would then make `classList.contains('')` false — the check failing, which is what
+ * it should do.
+ */
+const TOP_BAND_HIDDEN = css.topBandHidden ?? ''
 
 function workspace(id = 'w1'): WorkspaceView {
   return {
@@ -100,6 +112,8 @@ function mount(
     composerBlock?: { reason: string }
     /** Mutable view ledger used by registration-order regressions. */
     viewTabs?: ViewTab[]
+    /** No session selected at all: the column's own gate, not the session's. */
+    noSession?: boolean
   } = {},
 ) {
   const root = sid('root')
@@ -145,6 +159,9 @@ function mount(
       seatOwners.push({ key, owner })
     }
     if (key === 'conversation.hero.workspace') { pickerOwner = owner; return null }
+    // The column's band seat: a marker element, so a test can see WHERE in the
+    // column's stack the band renders (the seat itself is another package's).
+    if (key === 'conversation.session.band') return <div data-testid="band-seat" />
     if (key === 'conversation.session.header') {
       return (
         <ConversationSessionHeader
@@ -236,7 +253,7 @@ function mount(
       : (opts?.fallback ?? null)
   )) as ConversationRootProps['renderSlotChain']
   const props: ConversationRootProps = {
-    sessionId: SID,
+    sessionId: options.noSession === true ? undefined : SID,
     SessionProvider: ({ children }) => children(SID),
     useSession,
     useSessions: bindSnapshotSelector(sessions),
@@ -259,11 +276,13 @@ function mount(
 }
 
 describe('Hero chrome', () => {
-  it('renders the English preview badge through the hero locale seat', () => {
+  it('renders the product title through the hero locale seat', () => {
     const renderSlot = vi.fn<HeroShellProps['renderSlot']>(() => null)
     const view = render(<HeroShell t={makeTranslate(en, commonEn)} renderSlot={renderSlot} />)
-    expect(view.getByText('Into the Unknown')).toBeTruthy()
-    expect(view.getByText('Preview')).toBeTruthy()
+    expect(view.getByText('ForgeX')).toBeTruthy()
+    // The shipped phrase's "preview" badge is gone: the title is a product
+    // name, so nothing rides its top-right corner.
+    expect(view.queryByText('Preview')).toBeNull()
     expect(renderSlot).toHaveBeenCalledOnce()
     expect(renderSlot.mock.calls[0]?.[0]).toBe('conversation.hero.brand.mark')
     const brandMarkOwner = renderSlot.mock.calls[0]?.[1]
@@ -350,6 +369,57 @@ describe('ConversationRoot resident composer', () => {
     expect(b.slotCalls).toContain('conversation.session.header.utilities')
   })
 
+  it('the band is the column\'s top row: it stands above the whole header, over the chrome line', () => {
+    const b = mount(conversationSnapshot())
+    const chrome = b.view.container.querySelector('[data-phase]')
+    const header = b.view.container.querySelector('header')
+    const band = b.view.container.querySelector('[data-conversation-band]')
+    const tabs = b.view.container.querySelector('[role="tablist"]')
+    const rule = b.view.container.querySelector('[data-conversation-band-rule]')
+    const host = b.view.container.querySelector('[data-conversation-scroll]')
+    expect(b.slotCalls).toContain('conversation.session.band')
+    expect(band).not.toBeNull()
+    expect(rule).not.toBeNull()
+    // The ROOT's first row, with the header under it: a band inside the header would
+    // be the header's own second line — the row it used to share with the tabs.
+    expect(header?.contains(band)).toBe(false)
+    const order = [...(chrome?.children ?? [])]
+    expect(order.indexOf(band as Element)).toBe(0)
+    expect(order.indexOf(header as Element)).toBe(1)
+    expect(band?.contains(b.view.getByTestId('band-seat'))).toBe(true)
+    // The tabs stay the header's row, and are no longer row-mates of the band.
+    expect(tabs).not.toBeNull()
+    expect(tabs?.parentElement?.contains(band as Element)).toBe(false)
+    // The chrome line still closes the chrome ABOVE the transcript: below BOTH the
+    // band's row and the header, and after them in the document.
+    expect(header?.contains(rule)).toBe(false)
+    expect(order.indexOf(rule as Element)).toBe(2)
+    expect(order.indexOf(host as Element)).toBe(3)
+  })
+
+  it('blank session: the band row keeps its seat mounted but hidden, exactly as the header does', () => {
+    const b = mount(conversationSnapshot({ composerPhase: 'blank', blank: true }))
+    const band = b.view.container.querySelector('[data-conversation-band]')
+    // Still mounted, so the first message does not restart what the seat holds (its
+    // own host read, an open panel)...
+    expect(band).not.toBeNull()
+    expect(b.view.getByTestId('band-seat')).toBeTruthy()
+    // ...and hidden, because the hero screen is the session's own picture rather
+    // than chrome about the column.
+    expect(band?.classList.contains(TOP_BAND_HIDDEN)).toBe(true)
+  })
+
+  it('no session: the band row stays mounted, hidden with the chrome it is the top of', () => {
+    // The seat is the ROOT's (`scope: 'root'`), so it survives the session the header
+    // is scoped to; the column hides the row rather than unmounting it, so a seat
+    // never restarts on the way to the first message.
+    const b = mount(conversationSnapshot(), undefined, undefined, { noSession: true })
+    const band = b.view.container.querySelector('[data-conversation-band]')
+    expect(band).not.toBeNull()
+    expect(b.view.getByTestId('band-seat')).toBeTruthy()
+    expect(band?.classList.contains(TOP_BAND_HIDDEN)).toBe(true)
+  })
+
   it('sticky composer seat wraps the whole overlay chain, not only the fallback stack', () => {
     const b = mount(conversationSnapshot(), undefined, undefined, { overlayTakeover: true })
     const seat = b.view.container.querySelector('[data-composer-seat]')
@@ -373,8 +443,8 @@ describe('ConversationRoot resident composer', () => {
     const header = b.view.container.querySelector('header')
     expect(host).not.toBeNull()
     expect(header?.getAttribute('aria-hidden')).toBe('true')
-    expect(b.view.getByText('探索未至之境')).toBeTruthy()
-    expect(b.view.getByText('预览版')).toBeTruthy()
+    expect(b.view.getByText('ForgeX')).toBeTruthy()
+    expect(b.view.queryByText('预览版')).toBeNull()
     expect(b.view.queryByTestId('view-chat')).toBeNull()
     // The same machine-backed textarea is live in the hero, and the
     // persistence mirror stays bound (ConversationSession mounts chrome-hidden
@@ -397,7 +467,7 @@ describe('ConversationRoot resident composer', () => {
     const b = mount(conversationSnapshot({ composerPhase: 'blank', blank: true, openState: 'loading' }))
     const root = b.view.container.querySelector('[data-phase]')
     expect(root?.getAttribute('data-phase')).toBe('settling')
-    expect(b.view.queryByText('探索未至之境')).toBeNull()
+    expect(b.view.queryByText('ForgeX')).toBeNull()
   })
 
   it('settling phase: a session the list has no row for settles conservatively', () => {
@@ -422,7 +492,7 @@ describe('ConversationRoot resident composer', () => {
     // blank the column for the history round-trip.
     const root = b.view.container.querySelector('[data-phase]')
     expect(root?.getAttribute('data-phase')).toBe('hero')
-    expect(b.view.getByText('探索未至之境')).toBeTruthy()
+    expect(b.view.getByText('ForgeX')).toBeTruthy()
     expect(b.view.getByRole('textbox')).toBeTruthy()
   })
 
@@ -440,7 +510,7 @@ describe('ConversationRoot resident composer', () => {
     expect(after.value).toBe('kept across flip')
     expect(b.chat.store.getSnapshot().draft).toBe('kept across flip')
     expect(b.view.container.querySelector('[data-conversation-scroll]')?.contains(after)).toBe(true)
-    expect(b.view.queryByText('探索未至之境')).toBeNull()
+    expect(b.view.queryByText('ForgeX')).toBeNull()
     expect(b.view.getByTestId('view-chat')).toBeTruthy()
   })
 

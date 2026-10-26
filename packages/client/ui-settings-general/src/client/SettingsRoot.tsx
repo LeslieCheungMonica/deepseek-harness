@@ -11,6 +11,7 @@
  * to the step, so a mounted-but-deciding step paints nothing here.
  */
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import clsx from 'clsx'
 import {
   IconAgentPresetOutline16, IconCloseOutline16, IconDataOutline16,
@@ -150,7 +151,16 @@ export function SettingsRoot(props: SettingsRootComponentProps) {
       >
         {renderSlot('settings.trigger', { wide })}
       </button>
-      {open && (
+      {/* The panel is a full-viewport layer, so it is portaled to the document
+          body rather than rendered where the seat is. The seat is hosted by
+          whatever column owns `sidebar.settings` (the shipped shell's foot, or a
+          plugin's sidebar drawer), and inside that container the layer can fail
+          to reach the screen at all: measured in the macOS app's WKWebView, where
+          a host drawer kept this panel invisible while the mask beside it painted
+          normally — the DOM, geometry, and hit-testing were all correct, and
+          moving this subtree to the body fixed it outright. ui-primitives' Modal
+          portals for the same reason, so the two modals now behave alike. */}
+      {open && createPortal((
         <SettingsPanel
           rows={rows}
           renderSlot={renderSlot}
@@ -158,7 +168,7 @@ export function SettingsRoot(props: SettingsRootComponentProps) {
           onSelect={setActiveId}
           onClose={close}
         />
-      )}
+      ), document.body)}
       {/* Dialog chrome and `#root` inert ownership live inside each step's
           visible branch. A step still deciding (private facts loading)
           renders null, so nothing paints or blocks while it decides. */}

@@ -26,28 +26,64 @@
 }
 
 .header {
-  position: relative;
   flex: none;
   padding: 12px 28px 0 20px;
-  border-bottom: 1px solid transparent;
 }
 
-.header::after {
-  content: '';
-  position: absolute;
-  right: 0;
-  bottom: 1px;
-  left: 0;
-  z-index: 0;
+/* The chrome/transcript line. It used to be this header's own ::after, drawn just
+   inside its bottom edge; it is a sibling row now because the column's own band
+   (`conversation.session.band`) renders ABOVE the header — the band is chrome, so
+   the line closes the whole chrome rather than cutting between the band and the
+   header it stands over. Same 1px, same token, same place in the column's stack
+   when no band is registered. */
+.bandRule {
+  flex: none;
   height: 1px;
   background: var(--dsw-alias-border-l2);
-  pointer-events: none;
+}
+
+/* The column's top row: the band seat, above the header and so above everything
+   else the column shows. It draws nothing itself (an occupant owns its own box, fill
+   AND vertical air), and the band sits on the COLUMN's centre line — which is the
+   transcript's axis — so the strip reads as standing over the conversation it belongs
+   to rather than hanging off one side of it. The horizontal padding is the header's
+   own (20px left, 28px right) so the two rows share one axis.
+   NO vertical space of its own, deliberately: the slot's render site is an anchor div
+   whether or not anything is registered (see SlotOutlet), so a top padding here would
+   hold a deployment with no band occupant 8px off the column's top edge for nothing,
+   and `:empty` cannot see the difference. The row is therefore free when nothing is
+   registered, and the band's own air from the column's top is the occupant's. */
+.topBand {
+  flex: none;
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+  padding: 0 28px 0 20px;
+}
+
+/* The band's row while the column has no session to be chrome above: MOUNTED but
+   taking no space, for the same reason the header does it (see `.headerHidden`) —
+   unmounting would restart whatever the occupant holds, so the first message would
+   arrive at a seat that had forgotten what it had read. */
+.topBandHidden {
+  display: none;
 }
 
 /* Blank hero/settling: keep the strict Session header mounted without taking
    column space; the root-owned scrollport and composer remain below it. */
 .headerHidden {
   display: none;
+}
+
+/* The header's chrome row: the view tabs. It used to hold the column's band seat on
+   its right-hand half as well; that seat is the column's own row now (`.topBand`,
+   above the whole header), so this row is the tabs' and nothing else. The row is
+   still bottom-aligned because the tab underline is drawn at the tab's own floor. */
+.chromeRow {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  min-width: 0;
 }
 
 .titleRow {

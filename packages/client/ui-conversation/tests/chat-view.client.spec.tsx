@@ -441,6 +441,10 @@ describe('ChatView', () => {
     expect([...view.container.querySelectorAll('[data-chat-anchor-key]')].map(row => row.getAttribute('data-chat-anchor-key')))
       .toEqual([
         'fixture:user:1', 'fixture:assistant:2',
+        // A folded run is the row the reader is actually looking at, so the
+        // group carries its own anchor identity ahead of its members: a member
+        // hidden inside it cannot answer for position.
+        'group:fixture:tool:a',
         'fixture:tool:a', 'call:a', 'fixture:tool:b', 'call:b',
       ])
   })
@@ -1456,5 +1460,115 @@ describe('ChatView', () => {
     const failedView = render(<failed.ChatView {...failed.props} />)
     expect(failedView.getByText('Compaction cancelled.')).toBeTruthy()
     expect(failedView.container.querySelector('[data-state="error"]')).not.toBeNull()
+  })
+})
+
+describe('Activity groups', () => {
+  /** Assistant step carrying reasoning only — a foldable Think row. */
+  const thinkOnly = (seq: number, text = 'weigh the options'): AssistantMessageNode => ({
+    kind: 'assistant', seq, time: seq * 1_000, turn: 1, step: 1, blocks: [{ kind: 'reasoning', text }],
+  })
+
+  /** Assistant step carrying both reasoning and prose — the split case. */
+  const thinkAndAnswer = (seq: number, text: string): AssistantMessageNode => ({
+    kind: 'assistant',
+    seq,
+    time: seq * 1_000,
+    turn: 1,
+    step: 1,
+    blocks: [{ kind: 'reasoning', text: 'settle on the fix' }, { kind: 'text', text }],
+  })
+
+  /** An injected context row: process metadata, not part of the answer. */
+  const contextInjection = (seq: number): ConversationNode => ({
+    kind: 'context',
+    seq,
+    time: seq * 1_000,
+    content: [{ type: 'text', text: 'system prompt' }] as never,
+    source: null,
+    provenance: { role: 'system', name: 'dsh-system-prompt' } as never,
+    form: null,
+  })
+
+  const groupOf = (view: ReturnType<typeof render>): HTMLElement | null =>
+    view.container.querySelector<HTMLElement>('[data-activity-group]')
+
+  const foldedMembers = (view: ReturnType<typeof render>): string[] =>
+    [...(groupOf(view)?.querySelectorAll<HTMLElement>('[data-activity-member]') ?? [])]
+      .map(element => element.dataset.activityMember ?? '')
+
+  it('folds a run of Think steps and Tool rows into one group, leaving the answer outside', () => {
+    const h = makeHarness({
+      nodes: [user(1, 'q'), thinkOnly(2), toolResult(3, 'a'), toolResult(4, 'b'), assistant(5, 'Done.')],
+    })
+    const view = render(<h.ChatView {...h.props} />)
+
+    expect(view.getByRole('button', { name: /活动/ })).toBeTruthy()
+    expect(foldedMembers(view)).toEqual(['fixture:assistant:2', 'fixture:tool:a', 'fixture:tool:b'])
+    expect(view.container.querySelector('[data-activity-members]')?.hasAttribute('data-collapsed')).toBe(true)
+    // Folded, never unmounted: the seats keep their identity for position restore.
+    expect(view.getByTestId('tool-seat-a')).toBeTruthy()
+    expect(view.getByText('Done.')).toBeTruthy()
+    expect(groupOf(view)?.contains(view.getByText('Done.'))).toBe(false)
+  })
+
+  it('keeps a streaming step’s Think row folded and sends only its answer out of the group', () => {
+    const h = makeHarness({
+      nodes: [user(1, 'q'), toolResult(2, 'a'), toolResult(3, 'b')],
+      partial: { turn: 1, step: 2, blocks: [{ kind: 'reasoning', text: 'weigh' }] },
+    })
+    const view = render(<h.ChatView {...h.props} />)
+
+    expect(foldedMembers(view)).toEqual(['fixture:tool:a', 'fixture:tool:b', 'fixture:assistant:1:2'])
+    expect(view.getByText('2 次工具调用 · 1 条思考')).toBeTruthy()
+    expect(view.queryByText('Done.')).toBeNull()
+
+    act(() => {
+      h.set({
+        partial: {
+          turn: 1,
+          step: 2,
+          blocks: [{ kind: 'reasoning', text: 'weigh' }, { kind: 'text', text: 'Done.' }],
+        },
+      })
+    })
+
+    // The Think row stays folded; only the answer leaves the run.
+    expect(foldedMembers(view)).toEqual(['fixture:tool:a', 'fixture:tool:b', 'fixture:assistant:1:2'])
+    expect(groupOf(view)?.contains(view.getByText('Think'))).toBe(true)
+    expect(view.getByText('Done.')).toBeTruthy()
+    expect(groupOf(view)?.contains(view.getByText('Done.'))).toBe(false)
+  })
+
+  it('folds the answer step’s own Think row into the run instead of leaving it outside', () => {
+    const h = makeHarness({
+      nodes: [user(1, 'q'), toolResult(2, 'a'), toolResult(3, 'b'), thinkAndAnswer(4, 'Done.')],
+    })
+    const view = render(<h.ChatView {...h.props} />)
+
+    expect(view.getByText('2 次工具调用 · 1 条思考')).toBeTruthy()
+    expect(foldedMembers(view)).toEqual(['fixture:tool:a', 'fixture:tool:b', 'fixture:assistant:4'])
+    // The Think row is INSIDE the group and the prose is outside it.
+    expect(groupOf(view)?.contains(view.getByText('Think'))).toBe(true)
+    expect(groupOf(view)?.contains(view.getByText('Done.'))).toBe(false)
+    expect(view.getByText('Done.')).toBeTruthy()
+  })
+
+  it('leaves a lone activity row unfolded', () => {
+    const h = makeHarness({ nodes: [user(1, 'q'), toolResult(2, 'a')] })
+    const view = render(<h.ChatView {...h.props} />)
+
+    expect(groupOf(view)).toBeNull()
+    expect(view.getByTestId('tool-seat-a')).toBeTruthy()
+  })
+
+  it('folds an injected context row into the run without counting it as work', () => {
+    const h = makeHarness({
+      nodes: [user(1, 'q'), toolResult(2, 'a'), contextInjection(3), toolResult(4, 'b')],
+    })
+    const view = render(<h.ChatView {...h.props} />)
+
+    expect(view.getByText('2 次工具调用')).toBeTruthy()
+    expect(foldedMembers(view)).toEqual(['fixture:tool:a', 'fixture:context:3', 'fixture:tool:b'])
   })
 })

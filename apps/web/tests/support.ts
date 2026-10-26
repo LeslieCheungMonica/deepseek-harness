@@ -110,9 +110,27 @@ export async function connectFreshWorkspaceZh(page: Page, root: string, name = '
     .waitFor({ timeout: 15_000 })
 }
 
+/**
+ * Unfold every collapsed activity group in the transcript.
+ *
+ * A group is ONE disclosure row standing in for a run of Think and Tool rows,
+ * so a spec that wants to click a Tool row has to open its group first — the
+ * reader's own gesture, not a test workaround. Groups are addressed by their
+ * own container and then by their first disclosure row, because a group's
+ * members are disclosure rows too.
+ * @param page - the page rendering the transcript.
+ */
+export async function expandActivityGroups(page: Page): Promise<void> {
+  const groups = page.locator('[data-activity-group]')
+  const count = await groups.count()
+  for (let index = 0; index < count; index += 1) {
+    const header = groups.nth(index).locator('[data-disclosure-row]').first()
+    if (await header.getAttribute('aria-expanded') === 'false') await header.click()
+  }
+}
+
 /** Failure evidence goes to the gitignored .artifacts/ (repo convention). */
-export async function saveFailureShot(page: Page, name: string): Promise<void> {
-  const dir = fileURLToPath(new URL('../../../.artifacts', import.meta.url))
+export async function saveFailureShot(page: Page, name: string): Promise<void> {  const dir = fileURLToPath(new URL('../../../.artifacts', import.meta.url))
   mkdirSync(dir, { recursive: true })
   try {
     await page.screenshot({ path: `${dir}/${name}.png`, fullPage: true })
